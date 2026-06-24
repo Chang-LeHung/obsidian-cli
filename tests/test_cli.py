@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
-from pathlib import Path
-import sys
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from obsidian_cli import cli
-from obsidian_cli.cli import main
+from obsidian_cli.cli import ObsidianCLI, main
+from obsidian_cli.discovery import VaultCandidate, VaultLocator
 from obsidian_cli.vault import ObsidianVault, VaultError
 
 
@@ -95,26 +95,42 @@ class VaultTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.vault.read_note("Note.md"), "a\nbeta\nc\n")
 
-    def test_resolve_vault_path_prefers_env_var(self) -> None:
-        with patch.dict("os.environ", {"OBSIDIAN_VAULT": str(self.vault_root)}, clear=False):
-            resolved = cli.resolve_vault_path(None)
-        self.assertEqual(resolved, self.vault_root)
+    def test_vault_locator_prefers_env_var(self) -> None:
+        locator = VaultLocator(
+            env={"OBSIDIAN_VAULT": str(self.vault_root)}, home=self.vault_root
+        )
+        self.assertEqual(locator.resolve(None), self.vault_root)
 
-    def test_resolve_vault_path_discovers_default_vault(self) -> None:
-        with patch.dict("os.environ", {}, clear=True):
-            with patch.object(cli, "discover_vault_from_obsidian_config", return_value=None):
-                with patch.object(cli, "iter_default_vault_candidates", return_value=[self.vault_root]):
-                    resolved = cli.resolve_vault_path(None)
-        self.assertEqual(resolved, self.vault_root)
+    def test_vault_locator_discovers_default_vault(self) -> None:
+        locator = VaultLocator(env={}, home=self.vault_root.parent)
+        with patch.object(locator, "_discover_from_obsidian_config", return_value=None):
+            with patch.object(
+                locator,
+                "_iter_default_candidates",
+                return_value=[VaultCandidate(source="default", path=self.vault_root)],
+            ):
+                self.assertEqual(locator.resolve(None), self.vault_root)
 
-    def test_resolve_vault_path_uses_obsidian_config_first(self) -> None:
+    def test_vault_locator_uses_obsidian_config_first(self) -> None:
         config_vault = self.vault_root / "Configured"
         config_vault.mkdir()
         (config_vault / ".obsidian").mkdir()
-        with patch.dict("os.environ", {}, clear=True):
-            with patch.object(cli, "discover_vault_from_obsidian_config", return_value=config_vault):
-                resolved = cli.resolve_vault_path(None)
-        self.assertEqual(resolved, config_vault)
+        locator = VaultLocator(env={}, home=self.vault_root)
+        with patch.object(
+            locator,
+            "_discover_from_obsidian_config",
+            return_value=VaultCandidate(source="config", path=config_vault),
+        ):
+            self.assertEqual(locator.resolve(None), config_vault)
+
+    def test_cli_can_receive_custom_locator(self) -> None:
+        locator = VaultLocator(
+            env={"OBSIDIAN_VAULT": str(self.vault_root)}, home=self.vault_root
+        )
+        cli = ObsidianCLI(vault_locator=locator)
+        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            exit_code = cli.run(["check"])
+        self.assertEqual(exit_code, 0)
 
 
 if __name__ == "__main__":

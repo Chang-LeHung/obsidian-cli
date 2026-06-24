@@ -1,19 +1,21 @@
 # odcli
 
-一个基于 Python 的本地 CLI，用来对 Obsidian vault 做读写操作。它直接操作 vault 里的 Markdown 文件，不依赖 Obsidian 的私有接口，因此稳定、可移植，也方便后续扩展。
+`odcli` is a local Python CLI for reading and writing notes in an Obsidian vault.
+It works directly on Markdown files inside the vault, so it does not depend on private Obsidian APIs and remains portable and easy to extend.
 
-## 功能
+## Features
 
-- 校验 vault 路径是否有效
-- 列出 vault 中的 Markdown 笔记
-- 读取指定笔记
-- 按指定行区间读取笔记
-- 覆盖写入或自动创建笔记
-- 按指定行区间覆盖写入
-- 追加内容到笔记末尾
-- 在 vault 中全文搜索
+- Validate whether a vault path is available
+- List Markdown notes in the vault
+- Read a specific note
+- Read a specific line range from a note
+- Overwrite a note or create it automatically
+- Replace a specific line range in a note
+- Append content to a note
+- Full-text search across the vault
+- Auto-discover the default vault from Obsidian config or common macOS and Windows locations
 
-## 使用 uv
+## Using uv
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
@@ -21,62 +23,53 @@ uv sync
 uv run odcli --help
 ```
 
-运行测试：
+Run tests:
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
 uv run python -m unittest discover -s tests
 ```
 
-构建分发包：
+Build distributions:
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
 uv build
 ```
 
-发布到 PyPI 后，安装包名会是 `odcli`。
-安装后可执行命令同时支持 `odcli` 和 `obsidian-cli`。
+The published package name on PyPI is `odcli`.
+After installation, both `odcli` and `obsidian-cli` are available as command names.
 
-## 直接运行
+## Run Locally
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
 ./odcli --help
 ```
 
-兼容入口仍然保留：
+The compatibility entry point is still available:
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
 ./obsidian-cli --help
 ```
 
-如果你更喜欢显式调用 Python：
+If you prefer module execution:
 
 ```bash
 PYTHONPATH=src python3 -m obsidian_cli --help
 ```
 
-## 可选安装
+## Vault Resolution
 
-如果你想安装到虚拟环境中：
-
-```bash
-cd /Users/huchang/agents/obsidian_cli
-uv sync
-```
-
-## 指定 vault
-
-优先级如下：
+Resolution priority:
 
 1. `--vault /path/to/vault`
-2. 环境变量 `OBSIDIAN_VAULT`
-3. Obsidian 本地配置里最近打开的 vault
-4. 常见默认目录
+2. `OBSIDIAN_VAULT`
+3. The most recently opened vault recorded by local Obsidian config
+4. Common default directories
 
-当前内置的默认目录包括：
+Built-in default locations:
 
 - macOS: `~/Documents/Obsidian Vault`
 - macOS: `~/Documents/Obsidian`
@@ -84,7 +77,7 @@ uv sync
 - Windows: `%USERPROFILE%\\Documents\\Obsidian Vault`
 - Windows: `%USERPROFILE%\\Documents\\Obsidian`
 
-示例：
+Example:
 
 ```bash
 export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
@@ -98,47 +91,47 @@ export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
 ./odcli search "project alpha"
 ```
 
-## 命令
+## Commands
 
 ### `check`
 
-检查 vault 是否存在，以及是否包含 `.obsidian` 目录。
+Validate that the vault exists and report whether `.obsidian` is present.
 
 ### `list`
 
-列出 vault 中的 Markdown 文件。
+List Markdown notes in the vault.
 
-可选参数：
+Optional arguments:
 
 - `--limit N`
 
 ### `read`
 
-读取笔记内容。
+Read a note.
 
-参数：
+Arguments:
 
-- `note_path`：相对于 vault 根目录的路径
+- `note_path`: path relative to the vault root
 
 ### `write`
 
-覆盖写入笔记；若父目录不存在会自动创建。
+Overwrite a note. Parent directories are created automatically if needed.
 
-参数：
+Arguments:
 
 - `note_path`
 - `--content TEXT`
-- `--stdin`：从标准输入读取内容
+- `--stdin`
 
-可选参数：
+Optional arguments:
 
-- `--create-only`：若文件已存在则报错
+- `--create-only`
 
 ### `read-lines`
 
-读取指定行区间，行号从 `1` 开始，区间是闭区间。
+Read a line range. Line numbers are 1-based and inclusive.
 
-参数：
+Arguments:
 
 - `note_path`
 - `start_line`
@@ -146,9 +139,9 @@ export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
 
 ### `write-lines`
 
-用新内容替换指定行区间，行号从 `1` 开始，区间是闭区间。
+Replace a line range. Line numbers are 1-based and inclusive.
 
-参数：
+Arguments:
 
 - `note_path`
 - `start_line`
@@ -158,9 +151,9 @@ export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
 
 ### `append`
 
-追加内容到笔记末尾。
+Append content to the end of a note.
 
-参数：
+Arguments:
 
 - `note_path`
 - `--content TEXT`
@@ -168,14 +161,14 @@ export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
 
 ### `search`
 
-在所有 Markdown 笔记中搜索文本。
+Search across all Markdown notes in the vault.
 
-参数：
+Arguments:
 
 - `query`
 - `--case-sensitive`
 
-## 测试
+## Testing
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
