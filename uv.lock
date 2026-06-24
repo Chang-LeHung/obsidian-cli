@@ -395,8 +395,8 @@ wheels = [
 ]
 
 [[package]]
-name = "obsidian-cli"
-version = "0.1.0"
+name = "odcli"
+version = "0.1.2"
 source = { editable = "." }
 
 [package.dev-dependencies]
