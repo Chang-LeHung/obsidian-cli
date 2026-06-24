@@ -58,7 +58,9 @@ class ObsidianVault:
             raise VaultError(f"not a file: {note_path}")
         return path
 
-    def _validate_line_range(self, start_line: int, end_line: int, line_count: int) -> None:
+    def _validate_line_range(
+        self, start_line: int, end_line: int, line_count: int
+    ) -> None:
         if start_line < 1 or end_line < 1:
             raise VaultError("line numbers must be >= 1")
         if start_line > end_line:
@@ -68,7 +70,9 @@ class ObsidianVault:
                 f"line range {start_line}-{end_line} exceeds file length {line_count}"
             )
 
-    def write_note(self, note_path: str, content: str, create_only: bool = False) -> Path:
+    def write_note(
+        self, note_path: str, content: str, create_only: bool = False
+    ) -> Path:
         path = self.resolve_note(note_path)
         if path.suffix.lower() != ".md":
             raise VaultError("only markdown files are supported (.md)")
