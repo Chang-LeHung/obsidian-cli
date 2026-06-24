@@ -14,6 +14,7 @@ It works directly on Markdown files inside the vault, so it does not depend on p
 - Append content to a note
 - Full-text search across the vault
 - Auto-discover the default vault from Obsidian config or common macOS and Windows locations
+- Install odcli helper skills into Codex or Claude Code skill directories
 
 ## Using uv
 
@@ -167,6 +168,24 @@ Arguments:
 
 - `query`
 - `--case-sensitive`
+
+### `plugin install`
+
+Install odcli helper skills for local coding tools.
+
+Targets:
+
+- `codex-skill`: installs to `~/.codex/skills/odcli/SKILL.md`
+- `claude-skill`: installs to `~/.claude/skills/odcli/SKILL.md`
+- `all-skills`: installs both
+
+Examples:
+
+```bash
+odcli plugin install codex-skill
+odcli plugin install claude-skill
+odcli plugin install all-skills
+```
 
 ## Testing
 

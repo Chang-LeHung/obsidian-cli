@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from obsidian_cli.cli import ObsidianCLI, main
 from obsidian_cli.discovery import VaultCandidate, VaultLocator
+from obsidian_cli.plugins import SkillInstaller
 from obsidian_cli.vault import ObsidianVault, VaultError
 
 
@@ -131,6 +132,33 @@ class VaultTests(unittest.TestCase):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             exit_code = cli.run(["check"])
         self.assertEqual(exit_code, 0)
+
+    def test_skill_installer_installs_codex_skill(self) -> None:
+        installer = SkillInstaller(home=self.vault_root)
+        results = installer.install("codex-skill")
+        self.assertEqual(len(results), 1)
+        self.assertTrue(
+            (self.vault_root / ".codex" / "skills" / "odcli" / "SKILL.md").is_file()
+        )
+
+    def test_skill_installer_installs_claude_skill(self) -> None:
+        installer = SkillInstaller(home=self.vault_root)
+        results = installer.install("claude-skill")
+        self.assertEqual(len(results), 1)
+        self.assertTrue(
+            (self.vault_root / ".claude" / "skills" / "odcli" / "SKILL.md").is_file()
+        )
+
+    def test_cli_plugin_install_all_skills(self) -> None:
+        cli = ObsidianCLI(vault_locator=VaultLocator(env={}, home=self.vault_root))
+        cli._skill_installer = SkillInstaller(home=self.vault_root)
+        stdout = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(StringIO()):
+            exit_code = cli.run(["plugin", "install", "all-skills"])
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("codex-skill:", output)
+        self.assertIn("claude-skill:", output)
 
 
 if __name__ == "__main__":

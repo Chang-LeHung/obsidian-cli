@@ -5,18 +5,23 @@ import sys
 
 from obsidian_cli.commands import CommandRunner
 from obsidian_cli.discovery import VaultLocator
+from obsidian_cli.plugins import SkillInstaller
 from obsidian_cli.vault import ObsidianVault, VaultError
 
 
 class ObsidianCLI:
     def __init__(self, vault_locator: VaultLocator | None = None) -> None:
         self._vault_locator = vault_locator or VaultLocator()
+        self._skill_installer = SkillInstaller()
         self._parser = self._build_parser()
 
     def run(self, argv: list[str] | None = None) -> int:
         args = self._parser.parse_args(argv)
 
         try:
+            if args.command == "plugin":
+                return self._run_plugin_command(args)
+
             runner = CommandRunner(
                 ObsidianVault(self._vault_locator.resolve(args.vault))
             )
@@ -145,7 +150,30 @@ class ObsidianCLI:
             help="Use case-sensitive matching.",
         )
 
+        plugin_parser = subparsers.add_parser(
+            "plugin", help="Install odcli helper skills for supported coding tools."
+        )
+        plugin_subparsers = plugin_parser.add_subparsers(
+            dest="plugin_command", required=True
+        )
+        plugin_install_parser = plugin_subparsers.add_parser(
+            "install", help="Install an odcli skill into a supported tool directory."
+        )
+        plugin_install_parser.add_argument(
+            "target",
+            choices=["codex-skill", "claude-skill", "all-skills"],
+            help="Installation target.",
+        )
+
         return parser
+
+    def _run_plugin_command(self, args: argparse.Namespace) -> int:
+        if args.plugin_command == "install":
+            for result in self._skill_installer.install(args.target):
+                print(f"{result.target}: {result.path}")
+            return 0
+        self._parser.error(f"unsupported plugin command: {args.plugin_command}")
+        return 2
 
     @staticmethod
     def _read_content_arg(content: str | None, use_stdin: bool) -> str:

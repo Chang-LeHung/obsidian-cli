@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odcli"
-version = "0.1.3"
+version = "0.1.4"
 description = "A small CLI for reading and writing notes in a local Obsidian vault."
 readme = "README.md"
 requires-python = ">=3.11"
