@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-cli"
+version = "0.1.0"
+description = "A small CLI for reading and writing notes in a local Obsidian vault."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Hu Chang" }
+]
+dependencies = []
+keywords = ["obsidian", "cli", "markdown", "notes", "vault"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Utilities",
+  "Environment :: Console",
+]
+
+[project.urls]
+Homepage = "https://github.com/Chang-LeHung/obsidian-cli"
+Repository = "https://github.com/Chang-LeHung/obsidian-cli"
+Issues = "https://github.com/Chang-LeHung/obsidian-cli/issues"
+
+[project.scripts]
+obsidian-cli = "obsidian_cli.cli:main"
+
+[dependency-groups]
+dev = [
+  "build>=1.2.2",
+  "twine>=6.1.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+package = true
