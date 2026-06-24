@@ -6,9 +6,11 @@ from pathlib import Path
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from obsidian_cli import cli
 from obsidian_cli.cli import main
 from obsidian_cli.vault import ObsidianVault, VaultError
 
@@ -92,6 +94,27 @@ class VaultTests(unittest.TestCase):
             )
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.vault.read_note("Note.md"), "a\nbeta\nc\n")
+
+    def test_resolve_vault_path_prefers_env_var(self) -> None:
+        with patch.dict("os.environ", {"OBSIDIAN_VAULT": str(self.vault_root)}, clear=False):
+            resolved = cli.resolve_vault_path(None)
+        self.assertEqual(resolved, self.vault_root)
+
+    def test_resolve_vault_path_discovers_default_vault(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(cli, "discover_vault_from_obsidian_config", return_value=None):
+                with patch.object(cli, "iter_default_vault_candidates", return_value=[self.vault_root]):
+                    resolved = cli.resolve_vault_path(None)
+        self.assertEqual(resolved, self.vault_root)
+
+    def test_resolve_vault_path_uses_obsidian_config_first(self) -> None:
+        config_vault = self.vault_root / "Configured"
+        config_vault.mkdir()
+        (config_vault / ".obsidian").mkdir()
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(cli, "discover_vault_from_obsidian_config", return_value=config_vault):
+                resolved = cli.resolve_vault_path(None)
+        self.assertEqual(resolved, config_vault)
 
 
 if __name__ == "__main__":

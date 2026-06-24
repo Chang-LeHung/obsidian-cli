@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -71,9 +72,86 @@ def build_parser() -> argparse.ArgumentParser:
 
 def resolve_vault_path(cli_value: str | None) -> Path:
     raw_value = cli_value or os.environ.get("OBSIDIAN_VAULT")
-    if not raw_value:
-        raise VaultError("vault path is required; use --vault or OBSIDIAN_VAULT")
-    return Path(raw_value)
+    if raw_value:
+        return Path(raw_value)
+
+    discovered = discover_default_vault_path()
+    if discovered is not None:
+        return discovered
+
+    raise VaultError(
+        "vault path is required; use --vault, OBSIDIAN_VAULT, or place your vault in a default Obsidian location"
+    )
+
+
+def discover_default_vault_path() -> Path | None:
+    vault_from_config = discover_vault_from_obsidian_config()
+    if vault_from_config is not None:
+        return vault_from_config
+
+    for candidate in iter_default_vault_candidates():
+        if (candidate / ".obsidian").is_dir():
+            return candidate
+    return None
+
+
+def discover_vault_from_obsidian_config() -> Path | None:
+    for config_path in iter_obsidian_config_paths():
+        if not config_path.is_file():
+            continue
+        try:
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        vaults = payload.get("vaults")
+        if not isinstance(vaults, dict):
+            continue
+
+        candidates: list[tuple[int, str]] = []
+        for item in vaults.values():
+            if not isinstance(item, dict):
+                continue
+            path_value = item.get("path")
+            if not isinstance(path_value, str):
+                continue
+            ts_value = item.get("ts")
+            timestamp = ts_value if isinstance(ts_value, int) else -1
+            candidates.append((timestamp, path_value))
+
+        for _, path_value in sorted(candidates, reverse=True):
+            candidate = Path(path_value).expanduser()
+            if (candidate / ".obsidian").is_dir():
+                return candidate
+
+    return None
+
+
+def iter_obsidian_config_paths() -> list[Path]:
+    home = Path.home()
+    appdata = os.environ.get("APPDATA")
+    candidates = [
+        home / "Library" / "Application Support" / "obsidian" / "obsidian.json",
+        home / ".config" / "obsidian" / "obsidian.json",
+    ]
+    if appdata:
+        candidates.append(Path(appdata) / "obsidian" / "obsidian.json")
+    else:
+        candidates.append(
+            home / "AppData" / "Roaming" / "obsidian" / "obsidian.json"
+        )
+    return candidates
+
+
+def iter_default_vault_candidates() -> list[Path]:
+    home = Path.home()
+    return [
+        home / "Documents" / "Obsidian Vault",
+        home / "Documents" / "Obsidian",
+        home / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents",
+        home / "AppData" / "Roaming" / "Obsidian",
+        home / "AppData" / "Roaming" / "obsidian" / "vaults" / "default",
+    ]
 
 
 def read_content_arg(content: str | None, use_stdin: bool) -> str:

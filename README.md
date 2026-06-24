@@ -1,4 +1,4 @@
-# obsidian-cli
+# odcli
 
 一个基于 Python 的本地 CLI，用来对 Obsidian vault 做读写操作。它直接操作 vault 里的 Markdown 文件，不依赖 Obsidian 的私有接口，因此稳定、可移植，也方便后续扩展。
 
@@ -18,7 +18,7 @@
 ```bash
 cd /Users/huchang/agents/obsidian_cli
 uv sync
-uv run obsidian-cli --help
+uv run odcli --help
 ```
 
 运行测试：
@@ -35,7 +35,17 @@ cd /Users/huchang/agents/obsidian_cli
 uv build
 ```
 
+发布到 PyPI 后，安装包名会是 `odcli`。
+安装后可执行命令同时支持 `odcli` 和 `obsidian-cli`。
+
 ## 直接运行
+
+```bash
+cd /Users/huchang/agents/obsidian_cli
+./odcli --help
+```
+
+兼容入口仍然保留：
 
 ```bash
 cd /Users/huchang/agents/obsidian_cli
@@ -63,19 +73,29 @@ uv sync
 
 1. `--vault /path/to/vault`
 2. 环境变量 `OBSIDIAN_VAULT`
+3. Obsidian 本地配置里最近打开的 vault
+4. 常见默认目录
+
+当前内置的默认目录包括：
+
+- macOS: `~/Documents/Obsidian Vault`
+- macOS: `~/Documents/Obsidian`
+- macOS iCloud: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents`
+- Windows: `%USERPROFILE%\\Documents\\Obsidian Vault`
+- Windows: `%USERPROFILE%\\Documents\\Obsidian`
 
 示例：
 
 ```bash
 export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
-./obsidian-cli check
-./obsidian-cli list
-./obsidian-cli read Inbox/today.md
-./obsidian-cli read-lines Inbox/today.md 3 8
-./obsidian-cli write Inbox/today.md --content "# Today"
-./obsidian-cli write-lines Inbox/today.md 3 4 --content "- replaced\n- lines\n"
-./obsidian-cli append Inbox/today.md --content "\n- new item"
-./obsidian-cli search "project alpha"
+./odcli check
+./odcli list
+./odcli read Inbox/today.md
+./odcli read-lines Inbox/today.md 3 8
+./odcli write Inbox/today.md --content "# Today"
+./odcli write-lines Inbox/today.md 3 4 --content "- replaced\n- lines\n"
+./odcli append Inbox/today.md --content "\n- new item"
+./odcli search "project alpha"
 ```
 
 ## 命令
