@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odcli"
-version = "0.1.4"
+version = "0.1.5"
 description = "A small CLI for reading and writing notes in a local Obsidian vault."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-  { name = "Chang LeHung" }
+  { name = "odcli contributors" }
 ]
 dependencies = []
 keywords = ["obsidian", "cli", "markdown", "notes", "vault"]
@@ -24,11 +24,6 @@ classifiers = [
   "Topic :: Utilities",
   "Environment :: Console",
 ]
-
-[project.urls]
-Homepage = "https://github.com/Chang-LeHung/obsidian-cli"
-Repository = "https://github.com/Chang-LeHung/obsidian-cli"
-Issues = "https://github.com/Chang-LeHung/obsidian-cli/issues"
 
 [project.scripts]
 odcli = "obsidian_cli.cli:main"

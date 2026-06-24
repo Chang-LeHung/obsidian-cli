@@ -19,7 +19,7 @@ It works directly on Markdown files inside the vault, so it does not depend on p
 ## Using uv
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 uv sync
 uv run odcli --help
 ```
@@ -27,14 +27,14 @@ uv run odcli --help
 Run tests:
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 uv run python -m unittest discover -s tests
 ```
 
 Build distributions:
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 uv build
 ```
 
@@ -44,14 +44,14 @@ After installation, both `odcli` and `obsidian-cli` are available as command nam
 ## Run Locally
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 ./odcli --help
 ```
 
 The compatibility entry point is still available:
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 ./obsidian-cli --help
 ```
 
@@ -81,7 +81,7 @@ Built-in default locations:
 Example:
 
 ```bash
-export OBSIDIAN_VAULT="/Users/your-name/Documents/MyVault"
+export OBSIDIAN_VAULT="/path/to/MyVault"
 ./odcli check
 ./odcli list
 ./odcli read Inbox/today.md
@@ -190,6 +190,6 @@ odcli plugin install all-skills
 ## Testing
 
 ```bash
-cd /Users/huchang/agents/obsidian_cli
+cd path/to/obsidian_cli
 uv run python -m unittest discover -s tests
 ```
