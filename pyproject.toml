@@ -9,7 +9,7 @@ description = "A small CLI for reading and writing notes in a local Obsidian vau
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-  { name = "Hu Chang" }
+  { name = "Chang LeHung" }
 ]
 dependencies = []
 keywords = ["obsidian", "cli", "markdown", "notes", "vault"]
