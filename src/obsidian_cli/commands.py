@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from obsidian_cli.vault import ObsidianVault, VaultError
+from obsidian_cli.vault import VaultBackend, VaultError
 
 
 class CommandRunner:
-    def __init__(self, vault: ObsidianVault) -> None:
+    def __init__(self, vault: VaultBackend) -> None:
         self._vault = vault
 
     def check(self) -> int:

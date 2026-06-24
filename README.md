@@ -47,6 +47,47 @@ You can also override the vault per command:
 odcli --vault "/path/to/MyVault" list
 ```
 
+## Remote Vault over SSH
+
+You can operate on an Obsidian vault stored on another machine over SSH.
+
+Example:
+
+```bash
+odcli \
+  --ssh-host your-server \
+  --ssh-user your-user \
+  --vault /path/to/ObsidianVault \
+  list
+```
+
+Read a remote note:
+
+```bash
+odcli \
+  --ssh-host your-server \
+  --ssh-user your-user \
+  --vault /path/to/ObsidianVault \
+  read Inbox/today.md
+```
+
+Write a remote note:
+
+```bash
+odcli \
+  --ssh-host your-server \
+  --ssh-user your-user \
+  --vault /path/to/ObsidianVault \
+  write Inbox/today.md --content "# Remote note"
+```
+
+Optional SSH flags:
+
+- `--ssh-port`
+- `--ssh-identity`
+
+In SSH mode, `--vault` or `OBSIDIAN_VAULT` should point to the remote vault path.
+
 ## Common Commands
 
 Read a note:
@@ -205,6 +246,14 @@ Arguments:
 
 - `query`
 - `--case-sensitive`
+
+## Global Options
+
+- `--vault`
+- `--ssh-host`
+- `--ssh-user`
+- `--ssh-port`
+- `--ssh-identity`
 
 ## For Developers
 

@@ -6,7 +6,13 @@ import sys
 from obsidian_cli.commands import CommandRunner
 from obsidian_cli.discovery import VaultLocator
 from obsidian_cli.plugins import SkillInstaller
-from obsidian_cli.vault import ObsidianVault, VaultError
+from obsidian_cli.vault import (
+    ObsidianVault,
+    SshConfig,
+    SshObsidianVault,
+    VaultBackend,
+    VaultError,
+)
 
 
 class ObsidianCLI:
@@ -22,9 +28,7 @@ class ObsidianCLI:
             if args.command == "plugin":
                 return self._run_plugin_command(args)
 
-            runner = CommandRunner(
-                ObsidianVault(self._vault_locator.resolve(args.vault))
-            )
+            runner = CommandRunner(self._build_vault(args))
 
             if args.command == "check":
                 return runner.check()
@@ -71,6 +75,13 @@ class ObsidianCLI:
         parser.add_argument(
             "--vault",
             help="Path to the Obsidian vault. Falls back to OBSIDIAN_VAULT.",
+        )
+        parser.add_argument("--ssh-host", help="SSH host for a remote vault.")
+        parser.add_argument("--ssh-user", help="SSH username for a remote vault.")
+        parser.add_argument("--ssh-port", type=int, help="SSH port for a remote vault.")
+        parser.add_argument(
+            "--ssh-identity",
+            help="SSH identity file used when connecting to a remote vault.",
         )
 
         subparsers = parser.add_subparsers(dest="command", required=True)
@@ -174,6 +185,20 @@ class ObsidianCLI:
             return 0
         self._parser.error(f"unsupported plugin command: {args.plugin_command}")
         return 2
+
+    def _build_vault(self, args: argparse.Namespace) -> VaultBackend:
+        if args.ssh_host:
+            ssh_root = self._vault_locator.resolve_configured(args.vault)
+            return SshObsidianVault(
+                str(ssh_root),
+                SshConfig(
+                    host=args.ssh_host,
+                    user=args.ssh_user,
+                    port=args.ssh_port,
+                    identity_file=args.ssh_identity,
+                ),
+            )
+        return ObsidianVault(self._vault_locator.resolve(args.vault))
 
     @staticmethod
     def _read_content_arg(content: str | None, use_stdin: bool) -> str:

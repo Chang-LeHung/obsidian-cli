@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -13,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from obsidian_cli.cli import ObsidianCLI, main
 from obsidian_cli.discovery import VaultCandidate, VaultLocator
 from obsidian_cli.plugins import SkillInstaller
-from obsidian_cli.vault import ObsidianVault, VaultError
+from obsidian_cli.vault import ObsidianVault, SshConfig, SshObsidianVault, VaultError
 
 
 class VaultTests(unittest.TestCase):
@@ -102,6 +103,11 @@ class VaultTests(unittest.TestCase):
         )
         self.assertEqual(locator.resolve(None), self.vault_root)
 
+    def test_vault_locator_resolve_configured_requires_explicit_or_env(self) -> None:
+        locator = VaultLocator(env={}, home=self.vault_root)
+        with self.assertRaises(VaultError):
+            locator.resolve_configured(None)
+
     def test_vault_locator_discovers_default_vault(self) -> None:
         locator = VaultLocator(env={}, home=self.vault_root.parent)
         with patch.object(locator, "_discover_from_obsidian_config", return_value=None):
@@ -159,6 +165,75 @@ class VaultTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("codex-skill:", output)
         self.assertIn("claude-skill:", output)
+
+    def test_ssh_vault_list_notes(self) -> None:
+        def fake_runner(
+            command: list[str], **_: object
+        ) -> subprocess.CompletedProcess[str]:
+            if "test -d" in command[-1]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if "find ." in command[-1]:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    "Inbox/today.md\nProjects/alpha.md\n",
+                    "",
+                )
+            return subprocess.CompletedProcess(command, 1, "", "unexpected command")
+
+        vault = SshObsidianVault(
+            "/vault", SshConfig(host="example.com"), runner=fake_runner
+        )
+        self.assertEqual(vault.list_notes(), ["Inbox/today.md", "Projects/alpha.md"])
+
+    def test_ssh_vault_write_and_read_note(self) -> None:
+        written: dict[str, str] = {}
+
+        def fake_runner(
+            command: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            remote_command = command[-1]
+            if "test -f" in remote_command:
+                exists = "/vault/Inbox/test.md" in written
+                return subprocess.CompletedProcess(command, 0 if exists else 1, "", "")
+            if "mkdir -p" in remote_command and "cat >" in remote_command:
+                written["/vault/Inbox/test.md"] = str(kwargs.get("input", ""))
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if remote_command == "cat /vault/Inbox/test.md":
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    written["/vault/Inbox/test.md"],
+                    "",
+                )
+            return subprocess.CompletedProcess(command, 1, "", "unexpected command")
+
+        vault = SshObsidianVault(
+            "/vault", SshConfig(host="example.com"), runner=fake_runner
+        )
+        vault.write_note("Inbox/test.md", "# Hello\n")
+        self.assertEqual(vault.read_note("Inbox/test.md"), "# Hello\n")
+
+    def test_cli_builds_ssh_vault_when_requested(self) -> None:
+        cli = ObsidianCLI(
+            vault_locator=VaultLocator(
+                env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+            )
+        )
+        vault = cli._build_vault(
+            type(
+                "Args",
+                (),
+                {
+                    "vault": None,
+                    "ssh_host": "example.com",
+                    "ssh_user": "alice",
+                    "ssh_port": 2222,
+                    "ssh_identity": "~/.ssh/id_ed25519",
+                },
+            )()
+        )
+        self.assertIsInstance(vault, SshObsidianVault)
 
 
 if __name__ == "__main__":

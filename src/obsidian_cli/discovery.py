@@ -18,7 +18,7 @@ class VaultLocator:
     def __init__(
         self, env: dict[str, str] | None = None, home: Path | None = None
     ) -> None:
-        self._env = dict(env or os.environ)
+        self._env = dict(os.environ if env is None else env)
         self._home = (home or Path.home()).expanduser()
 
     def resolve(self, cli_value: str | None) -> Path:
@@ -36,6 +36,19 @@ class VaultLocator:
 
         raise VaultError(
             "vault path is required; use --vault, OBSIDIAN_VAULT, or place your vault in a default Obsidian location"
+        )
+
+    def resolve_configured(self, cli_value: str | None) -> Path:
+        cli_path = self._path_from_string(cli_value)
+        if cli_path is not None:
+            return cli_path
+
+        env_path = self._path_from_string(self._env.get("OBSIDIAN_VAULT"))
+        if env_path is not None:
+            return env_path
+
+        raise VaultError(
+            "vault path is required for SSH mode; use --vault or OBSIDIAN_VAULT"
         )
 
     def discover_default_vault(self) -> VaultCandidate | None:
