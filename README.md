@@ -1,67 +1,118 @@
 # odcli
 
-`odcli` is a local Python CLI for reading and writing notes in an Obsidian vault.
-It works directly on Markdown files inside the vault, so it does not depend on private Obsidian APIs and remains portable and easy to extend.
+`odcli` is a command-line tool for reading and writing notes in a local Obsidian vault.
 
-## Features
+It works directly on Markdown files inside the vault, so you can use it without any private Obsidian API.
 
-- Validate whether a vault path is available
-- List Markdown notes in the vault
-- Read a specific note
-- Read a specific line range from a note
-- Overwrite a note or create it automatically
-- Replace a specific line range in a note
-- Append content to a note
-- Full-text search across the vault
-- Auto-discover the default vault from Obsidian config or common macOS and Windows locations
-- Install odcli helper skills into Codex or Claude Code skill directories
+## Install
 
-## Using uv
+From PyPI:
 
 ```bash
-cd path/to/obsidian_cli
-uv sync
-uv run odcli --help
+pip install odcli
 ```
 
-Run tests:
+Or with `uv`:
 
 ```bash
-cd path/to/obsidian_cli
-uv run python -m unittest discover -s tests
+uv tool install odcli
 ```
 
-Build distributions:
+After installation, both command names are available:
 
 ```bash
-cd path/to/obsidian_cli
-uv build
+odcli --help
+obsidian-cli --help
 ```
 
-The published package name on PyPI is `odcli`.
-After installation, both `odcli` and `obsidian-cli` are available as command names.
+## Quickstart
 
-## Run Locally
+If your vault is already in a common location, `odcli` can usually find it automatically:
 
 ```bash
-cd path/to/obsidian_cli
-./odcli --help
+odcli check
+odcli list
 ```
 
-The compatibility entry point is still available:
+If you want to set the vault explicitly:
 
 ```bash
-cd path/to/obsidian_cli
-./obsidian-cli --help
+export OBSIDIAN_VAULT="/path/to/MyVault"
+odcli check
 ```
 
-If you prefer module execution:
+You can also override the vault per command:
 
 ```bash
-PYTHONPATH=src python3 -m obsidian_cli --help
+odcli --vault "/path/to/MyVault" list
 ```
 
-## Vault Resolution
+## Common Commands
+
+Read a note:
+
+```bash
+odcli read Inbox/today.md
+```
+
+Read specific lines:
+
+```bash
+odcli read-lines Inbox/today.md 3 8
+```
+
+Create or overwrite a note:
+
+```bash
+odcli write Inbox/today.md --content "# Today"
+```
+
+Replace a line range:
+
+```bash
+odcli write-lines Inbox/today.md 3 4 --content "- replaced\n- lines\n"
+```
+
+Append content:
+
+```bash
+odcli append Inbox/today.md --content "\n- new item"
+```
+
+Search across the vault:
+
+```bash
+odcli search "project alpha"
+```
+
+## Skill Install
+
+`odcli` can install helper skills for local coding tools.
+
+Install into Codex:
+
+```bash
+odcli plugin install codex-skill
+```
+
+Install into Claude Code:
+
+```bash
+odcli plugin install claude-skill
+```
+
+Install both:
+
+```bash
+odcli plugin install all-skills
+```
+
+Installed paths:
+
+- Codex: `~/.codex/skills/odcli/SKILL.md`
+- Claude Code: `~/.claude/skills/odcli/SKILL.md`
+
+## Vault Discovery
 
 Resolution priority:
 
@@ -78,21 +129,7 @@ Built-in default locations:
 - Windows: `%USERPROFILE%\\Documents\\Obsidian Vault`
 - Windows: `%USERPROFILE%\\Documents\\Obsidian`
 
-Example:
-
-```bash
-export OBSIDIAN_VAULT="/path/to/MyVault"
-./odcli check
-./odcli list
-./odcli read Inbox/today.md
-./odcli read-lines Inbox/today.md 3 8
-./odcli write Inbox/today.md --content "# Today"
-./odcli write-lines Inbox/today.md 3 4 --content "- replaced\n- lines\n"
-./odcli append Inbox/today.md --content "\n- new item"
-./odcli search "project alpha"
-```
-
-## Commands
+## Command Summary
 
 ### `check`
 
@@ -169,27 +206,26 @@ Arguments:
 - `query`
 - `--case-sensitive`
 
-### `plugin install`
+## For Developers
 
-Install odcli helper skills for local coding tools.
-
-Targets:
-
-- `codex-skill`: installs to `~/.codex/skills/odcli/SKILL.md`
-- `claude-skill`: installs to `~/.claude/skills/odcli/SKILL.md`
-- `all-skills`: installs both
-
-Examples:
+Run from source:
 
 ```bash
-odcli plugin install codex-skill
-odcli plugin install claude-skill
-odcli plugin install all-skills
+cd path/to/obsidian_cli
+uv sync
+uv run odcli --help
 ```
 
-## Testing
+Run tests:
 
 ```bash
 cd path/to/obsidian_cli
 uv run python -m unittest discover -s tests
+```
+
+Build distributions:
+
+```bash
+cd path/to/obsidian_cli
+uv build
 ```

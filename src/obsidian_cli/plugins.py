@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-SKILL_BODY = """# odcli
+SKILL_BODY = """---
+name: "odcli"
+description: "Use odcli to read, write, append, search, and patch notes inside a local Obsidian vault."
+---
+
+# odcli
 
 Use `odcli` when you need to read or write notes inside a local Obsidian vault.
 

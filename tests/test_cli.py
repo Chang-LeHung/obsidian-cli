@@ -137,17 +137,17 @@ class VaultTests(unittest.TestCase):
         installer = SkillInstaller(home=self.vault_root)
         results = installer.install("codex-skill")
         self.assertEqual(len(results), 1)
-        self.assertTrue(
-            (self.vault_root / ".codex" / "skills" / "odcli" / "SKILL.md").is_file()
-        )
+        skill_path = self.vault_root / ".codex" / "skills" / "odcli" / "SKILL.md"
+        self.assertTrue(skill_path.is_file())
+        self.assertTrue(skill_path.read_text(encoding="utf-8").startswith("---\n"))
 
     def test_skill_installer_installs_claude_skill(self) -> None:
         installer = SkillInstaller(home=self.vault_root)
         results = installer.install("claude-skill")
         self.assertEqual(len(results), 1)
-        self.assertTrue(
-            (self.vault_root / ".claude" / "skills" / "odcli" / "SKILL.md").is_file()
-        )
+        skill_path = self.vault_root / ".claude" / "skills" / "odcli" / "SKILL.md"
+        self.assertTrue(skill_path.is_file())
+        self.assertTrue(skill_path.read_text(encoding="utf-8").startswith("---\n"))
 
     def test_cli_plugin_install_all_skills(self) -> None:
         cli = ObsidianCLI(vault_locator=VaultLocator(env={}, home=self.vault_root))
