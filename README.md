@@ -153,6 +153,39 @@ Installed paths:
 - Codex: `~/.codex/skills/odcli/SKILL.md`
 - Claude Code: `~/.claude/skills/odcli/SKILL.md`
 
+## Release
+
+Local release to PyPI:
+
+```bash
+make pub
+```
+
+This runs tests, builds the wheel and source distribution, validates them with `twine check`, and uploads them to PyPI. The upload step temporarily ignores `HTTP_PROXY`, `HTTPS_PROXY`, and related proxy variables.
+
+To publish to another repository such as TestPyPI:
+
+```bash
+make pub PYPI_REPOSITORY=testpypi
+```
+
+Git tag based release from GitHub:
+
+1. Bump `version` in `pyproject.toml` and `src/obsidian_cli/__init__.py`.
+2. Commit and push the version change.
+3. Create and push the matching tag:
+
+```bash
+make push-tag
+```
+
+The GitHub Actions workflow listens for tags like `v0.1.8`, runs tests, builds the package, checks the distributions, and publishes to PyPI automatically.
+
+GitHub repository setup:
+
+1. Add the repository secret `PYPI_API_TOKEN`.
+2. Make sure the token has permission to upload the `odcli` project on PyPI.
+
 ## Vault Discovery
 
 Resolution priority:

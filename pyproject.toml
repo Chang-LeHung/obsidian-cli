@@ -33,6 +33,7 @@ obsidian-cli = "obsidian_cli.cli:main"
 dev = [
   "build>=1.2.2",
   "ruff>=0.14.0",
+  "setuptools>=68",
   "twine>=6.1.0",
 ]
 
