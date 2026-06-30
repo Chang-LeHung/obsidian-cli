@@ -109,7 +109,7 @@ class ObsidianCLI:
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             prog="obsidian-cli",
-            description="Read and write notes inside a local or remote Obsidian vault.",
+            description="CLI for reading and writing Obsidian vault notes — locally or over SSH.",
         )
         parser.add_argument(
             "--vault",
