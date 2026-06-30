@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odcli"
-version = "0.1.11"
+version = "0.1.12"
 description = "CLI for reading and writing Obsidian vault notes — locally or over SSH."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
   { name = "odcli contributors" }
 ]
-dependencies = []
+dependencies = ["jinja2>=3.1"]
 keywords = ["obsidian", "cli", "markdown", "notes", "vault", "ssh"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -45,6 +45,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+obsidian_cli = ["templates/*.j2"]
 
 [tool.uv]
 package = true
