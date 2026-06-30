@@ -325,4 +325,15 @@ class SshObsidianVault(VaultBackend):
 
     @staticmethod
     def _quote(path: PurePosixPath) -> str:
-        return shlex.quote(str(path))
+        raw = str(path)
+        # Leave a leading tilde-prefix unquoted so the remote shell expands
+        # it to $HOME. Quoting it (e.g. '~/Documents/...') makes the tilde a
+        # literal character and the path won't resolve. We keep the tilde
+        # prefix plus the first slash unquoted (those chars are shell-safe),
+        # then quote the remainder normally.
+        if raw.startswith("~"):
+            slash_idx = raw.find("/")
+            if slash_idx == -1:
+                return raw
+            return raw[: slash_idx + 1] + shlex.quote(raw[slash_idx + 1 :])
+        return shlex.quote(raw)

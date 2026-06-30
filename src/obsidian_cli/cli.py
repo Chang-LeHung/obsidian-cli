@@ -265,11 +265,13 @@ class ObsidianCLI:
         if alias:
             alias_config = self._ssh_config_locator.resolve_alias(alias)
             if alias_config is None:
-                raise VaultError(f"unknown ssh alias: {alias}")
-            host = host or alias_config.host_name or alias
-            user = user or alias_config.user
-            port = port or alias_config.port
-            identity = identity or alias_config.identity_file
+                # Mirror ssh: an unknown alias is treated as a literal hostname.
+                host = host or alias
+            else:
+                host = host or alias_config.host_name or alias
+                user = user or alias_config.user
+                port = port or alias_config.port
+                identity = identity or alias_config.identity_file
 
         if not host:
             return ObsidianVault(self._vault_locator.resolve(args.vault))

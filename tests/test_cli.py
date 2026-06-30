@@ -178,6 +178,16 @@ class VaultTests(unittest.TestCase):
         self.assertIn("codex-skill:", output)
         self.assertIn("claude-skill:", output)
 
+    def test_ssh_vault_quote_keeps_leading_tilde_unquoted(self) -> None:
+        from obsidian_cli.vault import SshObsidianVault
+        from pathlib import PurePosixPath
+
+        quote = SshObsidianVault._quote
+        self.assertEqual(quote(PurePosixPath("~/Documents/Obsidian Vault")), "~/'Documents/Obsidian Vault'")
+        self.assertEqual(quote(PurePosixPath("~")), "~")
+        self.assertEqual(quote(PurePosixPath("/abs/path")), "/abs/path")
+        self.assertEqual(quote(PurePosixPath("/abs/with space")), "'/abs/with space'")
+
     def test_ssh_vault_list_notes(self) -> None:
         def fake_runner(
             command: list[str], **_: object
@@ -274,8 +284,8 @@ class VaultTests(unittest.TestCase):
         config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text(
             "Host vm\n"
-            "  HostName 172.20.10.11\n"
-            "  User huchang\n"
+            "  HostName 203.0.113.10\n"
+            "  User alice\n"
             "  Port 2222\n"
             "  IdentityFile ~/.ssh/id_ed25519\n",
             encoding="utf-8",
@@ -284,8 +294,8 @@ class VaultTests(unittest.TestCase):
         resolved = locator.resolve_alias("vm")
         self.assertIsNotNone(resolved)
         assert resolved is not None
-        self.assertEqual(resolved.host_name, "172.20.10.11")
-        self.assertEqual(resolved.user, "huchang")
+        self.assertEqual(resolved.host_name, "203.0.113.10")
+        self.assertEqual(resolved.user, "alice")
         self.assertEqual(resolved.port, 2222)
         self.assertEqual(
             resolved.identity_file,
@@ -301,6 +311,63 @@ class VaultTests(unittest.TestCase):
         locator = SshConfigLocator(config_path=config)
         self.assertIsNone(locator.resolve_alias("vm"))
 
+    def test_ssh_config_locator_follows_include_directive(self) -> None:
+        from obsidian_cli.ssh_config import SshConfigLocator
+
+        ssh_dir = self.vault_root / ".ssh"
+        ssh_dir.mkdir(parents=True, exist_ok=True)
+        (ssh_dir / "config").write_text(
+            "Include devcloud_config\n"
+            "Host other\n  HostName 1.2.3.4\n",
+            encoding="utf-8",
+        )
+        (ssh_dir / "devcloud_config").write_text(
+            "Host macmini\n"
+            "  HostName 203.0.113.10\n"
+            "  User alice\n"
+            "  IdentityFile ~/.ssh/id_ed25519\n",
+            encoding="utf-8",
+        )
+        locator = SshConfigLocator(config_path=ssh_dir / "config")
+        resolved = locator.resolve_alias("macmini")
+        self.assertIsNotNone(resolved)
+        assert resolved is not None
+        self.assertEqual(resolved.host_name, "203.0.113.10")
+        self.assertEqual(resolved.user, "alice")
+
+    def test_cli_treats_unknown_alias_as_literal_hostname(self) -> None:
+        cli = ObsidianCLI(
+            vault_locator=VaultLocator(
+                env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+            ),
+            ssh_config_locator=None,  # type: ignore[arg-type]
+            env={"ODCLI_SSH_USER": "alice"},
+        )
+        # Use a real locator pointing at an empty config so the alias is unknown.
+        from obsidian_cli.ssh_config import SshConfigLocator
+
+        empty_config = self.vault_root / "empty_ssh_config"
+        empty_config.write_text("", encoding="utf-8")
+        cli._ssh_config_locator = SshConfigLocator(config_path=empty_config)
+        vault = cli._build_vault(
+            type(
+                "Args",
+                (),
+                {
+                    "vault": None,
+                    "ssh_alias": "macmini.example.com",
+                    "ssh_host": None,
+                    "ssh_user": None,
+                    "ssh_port": None,
+                    "ssh_identity": None,
+                },
+            )()
+        )
+        self.assertIsInstance(vault, SshObsidianVault)
+        ssh_config = vault._ssh_config  # type: ignore[attr-defined]
+        self.assertEqual(ssh_config.host, "macmini.example.com")
+        self.assertEqual(ssh_config.user, "alice")
+
     def test_cli_builds_ssh_vault_from_alias(self) -> None:
         from obsidian_cli.ssh_config import SshConfigLocator
 
@@ -308,8 +375,8 @@ class VaultTests(unittest.TestCase):
         config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text(
             "Host vm\n"
-            "  HostName 172.20.10.11\n"
-            "  User huchang\n"
+            "  HostName 203.0.113.10\n"
+            "  User alice\n"
             "  Port 2222\n"
             "  IdentityFile ~/.ssh/id_ed25519\n",
             encoding="utf-8",
@@ -337,8 +404,8 @@ class VaultTests(unittest.TestCase):
         )
         self.assertIsInstance(vault, SshObsidianVault)
         ssh_config = vault._ssh_config  # type: ignore[attr-defined]
-        self.assertEqual(ssh_config.host, "172.20.10.11")
-        self.assertEqual(ssh_config.user, "huchang")
+        self.assertEqual(ssh_config.host, "203.0.113.10")
+        self.assertEqual(ssh_config.user, "alice")
         self.assertEqual(ssh_config.port, 2222)
         self.assertEqual(
             ssh_config.identity_file, str(Path.home() / ".ssh" / "id_ed25519")

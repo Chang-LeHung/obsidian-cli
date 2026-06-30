@@ -31,14 +31,10 @@ class SshConfigLocator:
     def resolve_alias(self, alias: str) -> SshAliasConfig | None:
         if not self._config_path.is_file():
             return None
-        try:
-            text = self._config_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return None
 
         merged: dict[str, str] = {}
         matched = False
-        for entry in self._parse(text):
+        for entry in self._iter_entries(self._config_path, set()):
             hosts = entry.get("host", "").split()
             if not any(self._pattern_matches(name, alias) for name in hosts):
                 continue
@@ -70,8 +66,20 @@ class SshConfigLocator:
             identity_file=identity,
         )
 
-    @staticmethod
-    def _parse(text: str) -> list[dict[str, str]]:
+    def _iter_entries(
+        self, config_path: Path, seen: set[Path]
+    ) -> list[dict[str, str]]:
+        if not config_path.is_file():
+            return []
+        real = config_path.resolve()
+        if real in seen:
+            return []
+        seen.add(real)
+        try:
+            text = config_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return []
+
         entries: list[dict[str, str]] = []
         current: dict[str, str] = {}
         for raw_line in text.splitlines():
@@ -87,6 +95,16 @@ class SshConfigLocator:
                 if current:
                     entries.append(current)
                 current = {"host": value}
+            elif key_lower == "include":
+                if current:
+                    entries.append(current)
+                    current = {}
+                for pattern in value.split():
+                    expanded = Path(pattern).expanduser()
+                    if not expanded.is_absolute():
+                        expanded = config_path.parent / expanded
+                    for matched in sorted(expanded.parent.glob(expanded.name)):
+                        entries.extend(self._iter_entries(matched, seen))
             else:
                 current[key_lower] = value
         if current:
