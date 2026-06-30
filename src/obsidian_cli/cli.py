@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from obsidian_cli.commands import CommandRunner
 from obsidian_cli.discovery import VaultLocator
 from obsidian_cli.plugins import SkillInstaller
+from obsidian_cli.ssh_config import (
+    SshAliasConfig,
+    SshConfigLocator,
+    default_identity_file,
+    default_ssh_user,
+)
 from obsidian_cli.vault import (
     ObsidianVault,
     SshConfig,
@@ -15,13 +22,45 @@ from obsidian_cli.vault import (
 )
 
 
+_KNOWN_COMMANDS = {
+    "check",
+    "list",
+    "read",
+    "read-lines",
+    "write",
+    "append",
+    "write-lines",
+    "search",
+    "plugin",
+}
+
+_GLOBAL_VALUE_FLAGS = {
+    "--vault",
+    "--ssh-host",
+    "--ssh-user",
+    "--ssh-port",
+    "--ssh-identity",
+    "--ssh-alias",
+}
+
+
 class ObsidianCLI:
-    def __init__(self, vault_locator: VaultLocator | None = None) -> None:
-        self._vault_locator = vault_locator or VaultLocator()
+    def __init__(
+        self,
+        vault_locator: VaultLocator | None = None,
+        ssh_config_locator: SshConfigLocator | None = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        self._env = dict(os.environ if env is None else env)
+        self._vault_locator = vault_locator or VaultLocator(env=self._env)
+        self._ssh_config_locator = ssh_config_locator or SshConfigLocator()
         self._skill_installer = SkillInstaller()
         self._parser = self._build_parser()
 
     def run(self, argv: list[str] | None = None) -> int:
+        if argv is None:
+            argv = sys.argv[1:]
+        argv = self._inject_alias(argv)
         args = self._parser.parse_args(argv)
 
         try:
@@ -70,18 +109,38 @@ class ObsidianCLI:
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             prog="obsidian-cli",
-            description="Read and write notes inside a local Obsidian vault.",
+            description="Read and write notes inside a local or remote Obsidian vault.",
         )
         parser.add_argument(
             "--vault",
-            help="Path to the Obsidian vault. Falls back to OBSIDIAN_VAULT.",
+            help="Path to the Obsidian vault. Falls back to OBSIDIAN_VAULT/ODCLI_VAULT.",
         )
-        parser.add_argument("--ssh-host", help="SSH host for a remote vault.")
-        parser.add_argument("--ssh-user", help="SSH username for a remote vault.")
-        parser.add_argument("--ssh-port", type=int, help="SSH port for a remote vault.")
+        parser.add_argument(
+            "--ssh-alias",
+            help=(
+                "SSH host alias as defined in ~/.ssh/config. "
+                "Equivalent to: odcli <alias> <command>."
+            ),
+        )
+        parser.add_argument(
+            "--ssh-host",
+            help="SSH host for a remote vault. Falls back to ODCLI_SSH_HOST.",
+        )
+        parser.add_argument(
+            "--ssh-user",
+            help="SSH username. Falls back to ODCLI_SSH_USER or the current OS user.",
+        )
+        parser.add_argument(
+            "--ssh-port",
+            type=int,
+            help="SSH port. Falls back to ODCLI_SSH_PORT or the alias config.",
+        )
         parser.add_argument(
             "--ssh-identity",
-            help="SSH identity file used when connecting to a remote vault.",
+            help=(
+                "SSH identity file. Falls back to ODCLI_SSH_IDENTITY, the alias "
+                "config, or auto-discovery in ~/.ssh."
+            ),
         )
 
         subparsers = parser.add_subparsers(dest="command", required=True)
@@ -187,18 +246,48 @@ class ObsidianCLI:
         return 2
 
     def _build_vault(self, args: argparse.Namespace) -> VaultBackend:
-        if args.ssh_host:
-            ssh_root = self._vault_locator.resolve_configured(args.vault)
-            return SshObsidianVault(
-                str(ssh_root),
-                SshConfig(
-                    host=args.ssh_host,
-                    user=args.ssh_user,
-                    port=args.ssh_port,
-                    identity_file=args.ssh_identity,
-                ),
-            )
-        return ObsidianVault(self._vault_locator.resolve(args.vault))
+        host = args.ssh_host or self._env.get("ODCLI_SSH_HOST")
+        user = args.ssh_user or self._env.get("ODCLI_SSH_USER")
+        port = args.ssh_port
+        if port is None:
+            env_port = self._env.get("ODCLI_SSH_PORT")
+            if env_port:
+                try:
+                    port = int(env_port)
+                except ValueError as exc:
+                    raise VaultError(
+                        f"ODCLI_SSH_PORT must be an integer, got: {env_port}"
+                    ) from exc
+        identity = args.ssh_identity or self._env.get("ODCLI_SSH_IDENTITY")
+
+        alias_config: SshAliasConfig | None = None
+        alias = args.ssh_alias
+        if alias:
+            alias_config = self._ssh_config_locator.resolve_alias(alias)
+            if alias_config is None:
+                raise VaultError(f"unknown ssh alias: {alias}")
+            host = host or alias_config.host_name or alias
+            user = user or alias_config.user
+            port = port or alias_config.port
+            identity = identity or alias_config.identity_file
+
+        if not host:
+            return ObsidianVault(self._vault_locator.resolve(args.vault))
+
+        user = user or default_ssh_user()
+        if identity is None:
+            identity = default_identity_file()
+
+        ssh_root = self._vault_locator.resolve_configured(args.vault)
+        return SshObsidianVault(
+            str(ssh_root),
+            SshConfig(
+                host=host,
+                user=user,
+                port=port,
+                identity_file=identity,
+            ),
+        )
 
     @staticmethod
     def _read_content_arg(content: str | None, use_stdin: bool) -> str:
@@ -209,6 +298,37 @@ class ObsidianCLI:
         if use_stdin:
             return sys.stdin.read()
         raise VaultError("content is required; provide --content or --stdin")
+
+    @staticmethod
+    def _inject_alias(argv: list[str] | None) -> list[str]:
+        """Rewrite ``odcli vm list`` into ``odcli --ssh-alias vm list``.
+
+        Scans the global-flags zone (before the subcommand) for the first bare
+        positional argument that is not a known subcommand and treats it as an
+        SSH alias. Flags that consume a value are skipped so their values are
+        not mistaken for aliases.
+        """
+        if not argv:
+            return argv
+        tokens = list(argv)
+        i = 0
+        while i < len(tokens):
+            arg = tokens[i]
+            if arg == "--":
+                return tokens
+            if arg in _GLOBAL_VALUE_FLAGS:
+                i += 2
+                continue
+            if arg.startswith("--") and "=" in arg:
+                i += 1
+                continue
+            if arg.startswith("-"):
+                i += 1
+                continue
+            if arg in _KNOWN_COMMANDS:
+                return tokens
+            return tokens[:i] + ["--ssh-alias", arg] + tokens[i + 1 :]
+        return tokens
 
 
 def main(argv: list[str] | None = None) -> int:

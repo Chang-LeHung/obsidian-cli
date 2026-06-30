@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from obsidian_cli.ssh_config import default_ssh_vault_path
 from obsidian_cli.vault import VaultError
 
 
@@ -26,7 +27,7 @@ class VaultLocator:
         if cli_path is not None:
             return cli_path
 
-        env_path = self._path_from_string(self._env.get("OBSIDIAN_VAULT"))
+        env_path = self._path_from_string(self._vault_env())
         if env_path is not None:
             return env_path
 
@@ -35,7 +36,8 @@ class VaultLocator:
             return discovered.path
 
         raise VaultError(
-            "vault path is required; use --vault, OBSIDIAN_VAULT, or place your vault in a default Obsidian location"
+            "vault path is required; use --vault, OBSIDIAN_VAULT/ODCLI_VAULT, "
+            "or place your vault in a default Obsidian location"
         )
 
     def resolve_configured(self, cli_value: str | None) -> Path:
@@ -43,13 +45,21 @@ class VaultLocator:
         if cli_path is not None:
             return cli_path
 
-        env_path = self._path_from_string(self._env.get("OBSIDIAN_VAULT"))
+        env_path = self._path_from_string(self._vault_env())
         if env_path is not None:
             return env_path
 
+        default = default_ssh_vault_path()
+        if default:
+            return Path(default)
+
         raise VaultError(
-            "vault path is required for SSH mode; use --vault or OBSIDIAN_VAULT"
+            "vault path is required for SSH mode; use --vault or "
+            "OBSIDIAN_VAULT/ODCLI_VAULT"
         )
+
+    def _vault_env(self) -> str | None:
+        return self._env.get("OBSIDIAN_VAULT") or self._env.get("ODCLI_VAULT")
 
     def discover_default_vault(self) -> VaultCandidate | None:
         config_candidate = self._discover_from_obsidian_config()

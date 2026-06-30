@@ -51,7 +51,7 @@ odcli --vault "/path/to/MyVault" list
 
 You can operate on an Obsidian vault stored on another machine over SSH.
 
-Example:
+Example with explicit flags:
 
 ```bash
 odcli \
@@ -61,32 +61,58 @@ odcli \
   list
 ```
 
-Read a remote note:
+### SSH config alias (recommended)
+
+If you already have a host defined in `~/.ssh/config`, you can use it the same
+way you would with `ssh`:
 
 ```bash
-odcli \
-  --ssh-host your-server \
-  --ssh-user your-user \
-  --vault /path/to/ObsidianVault \
-  read Inbox/today.md
+odcli vm list
+odcli vm read Inbox/today.md
+odcli vm write Inbox/today.md --content "# Remote note"
 ```
 
-Write a remote note:
+The alias form is equivalent to `odcli --ssh-alias vm ...`. `HostName`, `User`,
+`Port`, and `IdentityFile` are read from your SSH config, and any explicit flag
+or environment variable overrides the config value.
+
+### Environment variables
+
+To avoid repeating the same flags every time, set defaults in your shell:
 
 ```bash
-odcli \
-  --ssh-host your-server \
-  --ssh-user your-user \
-  --vault /path/to/ObsidianVault \
-  write Inbox/today.md --content "# Remote note"
+export ODCLI_SSH_HOST=your-server
+export ODCLI_SSH_USER=your-user
+export ODCLI_SSH_PORT=22
+export ODCLI_SSH_IDENTITY=~/.ssh/id_ed25519
+export ODCLI_VAULT=/path/to/ObsidianVault   # OBSIDIAN_VAULT also works
 ```
+
+Resolution order for each SSH field:
+
+1. CLI flag (`--ssh-host`, `--ssh-user`, `--ssh-port`, `--ssh-identity`)
+2. Environment variable (`ODCLI_SSH_HOST`, `ODCLI_SSH_USER`,
+   `ODCLI_SSH_PORT`, `ODCLI_SSH_IDENTITY`)
+3. `~/.ssh/config` entry for the alias (when using `odcli <alias> ...`)
+4. Built-in defaults:
+   - **user**: the current OS user (`getpass.getuser()`)
+   - **identity file**: first existing key in `~/.ssh` (`id_ed25519`,
+     `id_ecdsa`, `id_rsa`)
+   - **vault**: OS-aware default path
+     - macOS/Linux: `~/Documents/Obsidian Vault`
+     - Windows: `Documents\Obsidian Vault`
+
+For the identity file, either set `ODCLI_SSH_IDENTITY` explicitly or rely on
+auto-discovery — you do not need both.
 
 Optional SSH flags:
 
 - `--ssh-port`
 - `--ssh-identity`
+- `--ssh-alias`
 
-In SSH mode, `--vault` or `OBSIDIAN_VAULT` should point to the remote vault path.
+In SSH mode, `--vault`, `ODCLI_VAULT`, or `OBSIDIAN_VAULT` should point to the
+remote vault path. If none is provided, an OS-aware default is used.
 
 ## Common Commands
 
@@ -250,10 +276,19 @@ Arguments:
 ## Global Options
 
 - `--vault`
+- `--ssh-alias` (or the bare `odcli <alias> <command>` form)
 - `--ssh-host`
 - `--ssh-user`
 - `--ssh-port`
 - `--ssh-identity`
+
+### Environment Variables
+
+- `OBSIDIAN_VAULT` / `ODCLI_VAULT`: vault path
+- `ODCLI_SSH_HOST`: SSH host
+- `ODCLI_SSH_USER`: SSH username
+- `ODCLI_SSH_PORT`: SSH port
+- `ODCLI_SSH_IDENTITY`: SSH private key path
 
 ## For Developers
 

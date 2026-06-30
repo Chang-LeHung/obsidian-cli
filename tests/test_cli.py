@@ -103,10 +103,22 @@ class VaultTests(unittest.TestCase):
         )
         self.assertEqual(locator.resolve(None), self.vault_root)
 
-    def test_vault_locator_resolve_configured_requires_explicit_or_env(self) -> None:
+    def test_vault_locator_resolve_configured_uses_ssh_default(self) -> None:
         locator = VaultLocator(env={}, home=self.vault_root)
-        with self.assertRaises(VaultError):
-            locator.resolve_configured(None)
+        result = locator.resolve_configured(None)
+        self.assertIsNotNone(result)
+
+    def test_vault_locator_resolve_configured_prefers_env(self) -> None:
+        locator = VaultLocator(
+            env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+        )
+        self.assertEqual(locator.resolve_configured(None), Path("/remote/vault"))
+
+    def test_vault_locator_resolve_configured_accepts_odcli_vault_env(self) -> None:
+        locator = VaultLocator(
+            env={"ODCLI_VAULT": "/remote/vault"}, home=self.vault_root
+        )
+        self.assertEqual(locator.resolve_configured(None), Path("/remote/vault"))
 
     def test_vault_locator_discovers_default_vault(self) -> None:
         locator = VaultLocator(env={}, home=self.vault_root.parent)
@@ -218,7 +230,8 @@ class VaultTests(unittest.TestCase):
         cli = ObsidianCLI(
             vault_locator=VaultLocator(
                 env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
-            )
+            ),
+            env={},
         )
         vault = cli._build_vault(
             type(
@@ -226,6 +239,7 @@ class VaultTests(unittest.TestCase):
                 (),
                 {
                     "vault": None,
+                    "ssh_alias": None,
                     "ssh_host": "example.com",
                     "ssh_user": "alice",
                     "ssh_port": 2222,
@@ -234,6 +248,158 @@ class VaultTests(unittest.TestCase):
             )()
         )
         self.assertIsInstance(vault, SshObsidianVault)
+
+    def test_cli_ssh_alias_injection_rewrites_bare_positional(self) -> None:
+        rewritten = ObsidianCLI._inject_alias(["vm", "list"])
+        self.assertEqual(rewritten, ["--ssh-alias", "vm", "list"])
+
+    def test_cli_ssh_alias_injection_skips_known_command(self) -> None:
+        rewritten = ObsidianCLI._inject_alias(["list"])
+        self.assertEqual(rewritten, ["list"])
+
+    def test_cli_ssh_alias_injection_skips_flag_values(self) -> None:
+        rewritten = ObsidianCLI._inject_alias(["--vault", "my-vault", "vm", "list"])
+        self.assertEqual(
+            rewritten, ["--vault", "my-vault", "--ssh-alias", "vm", "list"]
+        )
+
+    def test_cli_ssh_alias_injection_skips_equals_flag_values(self) -> None:
+        rewritten = ObsidianCLI._inject_alias(["--vault=my-vault", "list"])
+        self.assertEqual(rewritten, ["--vault=my-vault", "list"])
+
+    def test_ssh_config_locator_resolves_alias(self) -> None:
+        from obsidian_cli.ssh_config import SshConfigLocator
+
+        config = self.vault_root / ".ssh" / "config"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            "Host vm\n"
+            "  HostName 172.20.10.11\n"
+            "  User huchang\n"
+            "  Port 2222\n"
+            "  IdentityFile ~/.ssh/id_ed25519\n",
+            encoding="utf-8",
+        )
+        locator = SshConfigLocator(config_path=config)
+        resolved = locator.resolve_alias("vm")
+        self.assertIsNotNone(resolved)
+        assert resolved is not None
+        self.assertEqual(resolved.host_name, "172.20.10.11")
+        self.assertEqual(resolved.user, "huchang")
+        self.assertEqual(resolved.port, 2222)
+        self.assertEqual(
+            resolved.identity_file,
+            str(Path.home() / ".ssh" / "id_ed25519"),
+        )
+
+    def test_ssh_config_locator_returns_none_for_unknown_alias(self) -> None:
+        from obsidian_cli.ssh_config import SshConfigLocator
+
+        config = self.vault_root / ".ssh" / "config"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text("Host other\n  HostName 1.2.3.4\n", encoding="utf-8")
+        locator = SshConfigLocator(config_path=config)
+        self.assertIsNone(locator.resolve_alias("vm"))
+
+    def test_cli_builds_ssh_vault_from_alias(self) -> None:
+        from obsidian_cli.ssh_config import SshConfigLocator
+
+        config = self.vault_root / ".ssh" / "config"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            "Host vm\n"
+            "  HostName 172.20.10.11\n"
+            "  User huchang\n"
+            "  Port 2222\n"
+            "  IdentityFile ~/.ssh/id_ed25519\n",
+            encoding="utf-8",
+        )
+        cli = ObsidianCLI(
+            vault_locator=VaultLocator(
+                env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+            ),
+            ssh_config_locator=SshConfigLocator(config_path=config),
+            env={},
+        )
+        vault = cli._build_vault(
+            type(
+                "Args",
+                (),
+                {
+                    "vault": None,
+                    "ssh_alias": "vm",
+                    "ssh_host": None,
+                    "ssh_user": None,
+                    "ssh_port": None,
+                    "ssh_identity": None,
+                },
+            )()
+        )
+        self.assertIsInstance(vault, SshObsidianVault)
+        ssh_config = vault._ssh_config  # type: ignore[attr-defined]
+        self.assertEqual(ssh_config.host, "172.20.10.11")
+        self.assertEqual(ssh_config.user, "huchang")
+        self.assertEqual(ssh_config.port, 2222)
+        self.assertEqual(
+            ssh_config.identity_file, str(Path.home() / ".ssh" / "id_ed25519")
+        )
+
+    def test_cli_ssh_env_vars_provide_defaults(self) -> None:
+        cli = ObsidianCLI(
+            vault_locator=VaultLocator(
+                env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+            ),
+            env={
+                "ODCLI_SSH_HOST": "example.com",
+                "ODCLI_SSH_USER": "bob",
+                "ODCLI_SSH_PORT": "2222",
+            },
+        )
+        vault = cli._build_vault(
+            type(
+                "Args",
+                (),
+                {
+                    "vault": None,
+                    "ssh_alias": None,
+                    "ssh_host": None,
+                    "ssh_user": None,
+                    "ssh_port": None,
+                    "ssh_identity": None,
+                },
+            )()
+        )
+        self.assertIsInstance(vault, SshObsidianVault)
+        ssh_config = vault._ssh_config  # type: ignore[attr-defined]
+        self.assertEqual(ssh_config.host, "example.com")
+        self.assertEqual(ssh_config.user, "bob")
+        self.assertEqual(ssh_config.port, 2222)
+
+    def test_cli_cli_flag_overrides_ssh_env_var(self) -> None:
+        cli = ObsidianCLI(
+            vault_locator=VaultLocator(
+                env={"OBSIDIAN_VAULT": "/remote/vault"}, home=self.vault_root
+            ),
+            env={"ODCLI_SSH_HOST": "example.com", "ODCLI_SSH_USER": "bob"},
+        )
+        vault = cli._build_vault(
+            type(
+                "Args",
+                (),
+                {
+                    "vault": None,
+                    "ssh_alias": None,
+                    "ssh_host": "override.com",
+                    "ssh_user": None,
+                    "ssh_port": None,
+                    "ssh_identity": None,
+                },
+            )()
+        )
+        self.assertIsInstance(vault, SshObsidianVault)
+        ssh_config = vault._ssh_config  # type: ignore[attr-defined]
+        self.assertEqual(ssh_config.host, "override.com")
+        self.assertEqual(ssh_config.user, "bob")
 
 
 if __name__ == "__main__":
